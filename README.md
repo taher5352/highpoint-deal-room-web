@@ -4,6 +4,10 @@ An independent, public HTML dashboard for High Point, NC 27260 property research
 
 Website: https://taher5352.github.io/highpoint-deal-room-web/
 
+## Open an individual property
+
+Select a property address or **Open property** in the records table. Each shareable property page groups the available records for that exact county-qualified parcel ID. Code cases from other counties remain separate. The page links to the official county property record when its Guilford parcel identity is established. General publisher pages and raw case data are labeled separately.
+
 ## Update shared scenarios
 
 Open [config/workspace.json in GitHub's editor](https://github.com/taher5352/highpoint-deal-room-web/edit/main/config/workspace.json), sign in to the repository owner's GitHub account, edit the numbers, and commit the changes. The publishing workflow validates the file and updates the website. Visitors cannot change the shared file. This version uses GitHub's file editor; it does not include a separate in-dashboard editing account.
