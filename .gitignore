@@ -3,3 +3,6 @@ node_modules/
 .env.*
 *.tmp
 .DS_Store
+docs/downloads/*.xlsx
+__pycache__/
+*.pyc

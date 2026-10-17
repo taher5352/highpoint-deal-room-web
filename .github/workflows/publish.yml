@@ -35,11 +35,13 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: Collect official public records
         run: node scripts/collect.mjs
+      - name: Collect county property characteristics
+        run: node scripts/enrich-properties.mjs
       - name: Keep the latest snapshots for the next run
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/data/records.json docs/data/workspace.json
+          git add docs/data/records.json docs/data/workspace.json docs/data/property-details.json
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh public-record snapshots'
           fi
@@ -50,6 +52,15 @@ jobs:
             git commit -m 'Publish latest shared scenario edits'
           fi
           git push
+      - name: Prepare Python for Excel export
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Prepare the daily Excel export
+        run: |
+          python3 -m pip install --disable-pip-version-check --require-hashes -r config/workbook-requirements.txt
+          node scripts/workbook-data.mjs "$RUNNER_TEMP/workbook-data.json"
+          python3 scripts/update-workbook.py "$RUNNER_TEMP/workbook-data.json"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload static website
@@ -64,7 +75,8 @@ jobs:
           node --input-type=module - <<'JS'
           import { readFileSync } from 'node:fs';
           const data = JSON.parse(readFileSync('docs/data/records.json', 'utf8'));
-          if (data.last_run?.status !== 'succeeded') {
+          const details = JSON.parse(readFileSync('docs/data/property-details.json', 'utf8'));
+          if (data.last_run?.status !== 'succeeded' || details.last_error) {
             console.error('At least one source failed. Last good records and visible source warnings were published.');
             process.exitCode = 1;
           }

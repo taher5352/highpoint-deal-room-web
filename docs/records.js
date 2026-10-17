@@ -11,6 +11,7 @@ const money=value=>typeof value==='number'&&Number.isFinite(value)?new Intl.Numb
 const sourceState=source=>!source.last_success_at?'not_collected':source.last_error?'last_good_retained':Date.now()-Date.parse(source.last_success_at)>48*3600000?'stale':'collected';
 function render(){
  if(!data)return;
+ const excel=el('excel-workbook');if(excel)excel.href='./downloads/High-Point-Property-Research.xlsx?v='+encodeURIComponent(data.generated_at||'latest');
  el('schedule-state').textContent=data.schedule?.enabled?'9 AM & 4 PM Eastern':'Schedule not confirmed';
  el('schedule-detail').textContent=data.schedule?.enabled?'Scheduled checks · Runs may be delayed':'Check refresh history for completed runs';
  const query=el('record-search').value.trim().toLowerCase(),scope=el('record-scope').value,type=el('record-type').value;

@@ -8,6 +8,14 @@ Website: https://taher5352.github.io/highpoint-deal-room-web/
 
 Select a property address or **Open property** in the records table. Each shareable property page groups the available records for that exact county-qualified parcel ID. Code cases from other counties remain separate. The page links to the official county property record when its Guilford parcel identity is established. General publisher pages and raw case data are labeled separately.
 
+## Daily Excel workbook
+
+Use **Download full Excel workbook** on the dashboard for the latest published file. It is regenerated after each scheduled record check, including current county parcel characteristics. The workbook has a property table for matched 27260 research parcels, every saved source row, source health, and separate shared scenarios. Named tables, stable property keys, typed amounts/dates, hyperlinks and filter controls support PivotTables and dashboard imports.
+
+Photo-page links open the county property application, where the Photos tab is available. Direct photo URLs remain blank because the county display uses temporary browser image URLs. Asking prices, listing descriptions and sale intent are not supplied by these sources.
+
+A downloaded copy is a dated snapshot and does not refresh itself. Download the latest file for each daily review; keep private notes separately keyed by Property key so a new download cannot overwrite them. The workbook is generated on GitHub using the authored Excel template, with no paid service or local Mac installation.
+
 ## Update shared scenarios
 
 Open [config/workspace.json in GitHub's editor](https://github.com/taher5352/highpoint-deal-room-web/edit/main/config/workspace.json), sign in to the repository owner's GitHub account, edit the numbers, and commit the changes. The publishing workflow validates the file and updates the website. Visitors cannot change the shared file. This version uses GitHub's file editor; it does not include a separate in-dashboard editing account.
