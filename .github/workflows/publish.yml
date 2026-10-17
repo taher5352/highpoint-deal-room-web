@@ -1,0 +1,71 @@
+name: Refresh records and publish dashboard
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9,16 * * *'
+      timezone: America/New_York
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: highpoint-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out public dashboard
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prepare Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Check collection safeguards
+        run: node --test tests/*.test.mjs
+      - name: Collect official public records
+        run: node scripts/collect.mjs
+      - name: Keep the latest snapshots for the next run
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/data/records.json docs/data/workspace.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh public-record snapshots'
+          fi
+          git pull --rebase origin main
+          node scripts/collect.mjs --workspace-only
+          git add docs/data/workspace.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish latest shared scenario edits'
+          fi
+          git push
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Upload static website
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: docs
+      - name: Publish independent website
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - name: Report any source failures after publishing retained data
+        run: |
+          node --input-type=module - <<'JS'
+          import { readFileSync } from 'node:fs';
+          const data = JSON.parse(readFileSync('docs/data/records.json', 'utf8'));
+          if (data.last_run?.status !== 'succeeded') {
+            console.error('At least one source failed. Last good records and visible source warnings were published.');
+            process.exitCode = 1;
+          }
+          JS
