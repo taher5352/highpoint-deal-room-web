@@ -122,7 +122,6 @@
       render();
       const deepLink=new URLSearchParams(location.search).get('estimate');
       if(initial&&deepLink){
-        section.scrollIntoView({block:'start'});
         if(data.records.some(property=>String(property.parcel_id)===deepLink))showProperty(deepLink);
       }
     }catch(error){
@@ -133,7 +132,7 @@
         $('#rough-pagination').textContent='No estimate snapshot loaded';$('#rough-prev').disabled=true;$('#rough-next').disabled=true;
       }
       console.warn('Renovation estimates:',error.message);
-    }finally{refreshing=false;}
+    }finally{refreshing=false;if(initial)document.dispatchEvent(new CustomEvent('highpoint:initial-render',{detail:{section:'renovation'}}));}
   }
   refresh(true);setInterval(()=>refresh(),5*60*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 })();

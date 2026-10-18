@@ -48,5 +48,32 @@ window.addEventListener('resize',queueNavigation);
 window.addEventListener('load',queueNavigation);
 if(typeof ResizeObserver!=='undefined'){const navigationResize=new ResizeObserver(queueNavigation);navigation.forEach(item=>navigationResize.observe(item.target));}
 syncNavigation();
+function watchInitialAnchor(){
+ const initialHash=location.hash;
+ const anchorHash=initialHash||(new URLSearchParams(location.search).has('estimate')?'#renovation':'');
+ let target;try{target=anchorHash&&document.getElementById(decodeURIComponent(anchorHash.slice(1)));}catch{}
+ if(!target)return()=>{};
+ const required=new Set(['scenarios']);
+ if(document.getElementById('public-records'))required.add('records');
+ if(document.getElementById('renovation'))required.add('renovation');
+ const inputs=['wheel','touchstart','pointerdown','keydown'];
+ let pending=true,queued=false;
+ function cancel(){pending=false;inputs.forEach(type=>window.removeEventListener(type,cancel,true));window.removeEventListener('hashchange',cancel);document.removeEventListener('highpoint:initial-render',rendered);}
+ function ready(part){
+  if(!pending)return;required.delete(part);
+  if(required.size||queued)return;queued=true;
+  // Let both tables finish layout and the browser's original anchor jump settle.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   if(!pending||location.hash!==initialHash)return;
+   cancel();target.scrollIntoView({block:'start',behavior:'auto'});queueNavigation();
+  }));
+ }
+ function rendered(event){ready(event.detail?.section);}
+ inputs.forEach(type=>window.addEventListener(type,cancel,{capture:true,passive:true}));
+ window.addEventListener('hashchange',cancel);
+ document.addEventListener('highpoint:initial-render',rendered);
+ return ready;
+}
+const initialNavigationReady=watchInitialAnchor();
 fillSettings();render();
-(async()=>{try{const response=await fetch('./data/workspace.json',{cache:'no-store'});if(!response.ok)throw Error('Shared scenarios unavailable');const value=await response.json(),workspace=value.workspace??value;if(!M.validState(workspace))throw Error('Shared scenarios have an invalid format');state=workspace;fillSettings();render();$('#storage-warning').hidden=true;}catch{$('#storage-warning').hidden=false;}})();
+(async()=>{try{const response=await fetch('./data/workspace.json',{cache:'no-store'});if(!response.ok)throw Error('Shared scenarios unavailable');const value=await response.json(),workspace=value.workspace??value;if(!M.validState(workspace))throw Error('Shared scenarios have an invalid format');state=workspace;fillSettings();render();$('#storage-warning').hidden=true;}catch{$('#storage-warning').hidden=false;}finally{initialNavigationReady('scenarios');}})();
