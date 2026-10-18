@@ -4,6 +4,18 @@ An independent, public HTML dashboard for High Point, NC 27260 property research
 
 Website: https://taher5352.github.io/highpoint-deal-room-web/
 
+## Rough renovation estimates
+
+Open **Renovation estimates** for three assumed repair scopes, a recorded-transfer resale benchmark and conditional purchase ceilings. The drawer shows the exact transfers used and lets visitors enter a proposed purchase price to calculate project cost, profit before income tax and return on cost. Proposed prices stay in the visitor's browser session and are not published or sent to a provider.
+
+The model uses the existing shared profit, closing-cost, contingency and holding assumptions in `config/workspace.json`. Repair bands and cohort policy are owner-managed in [config/renovation.json](https://github.com/taher5352/highpoint-deal-room-web/edit/main/config/renovation.json). The bands are analyst scenarios within cited national remodeling ranges. They are not property-condition diagnoses or local contractor quotes; the same resale range is used across all scopes and no future appreciation is assumed. The Charlotte historical budget is explanatory context and is not a property input. Reconstruction is outside this screening model.
+
+County transfer data is collected through a bounded public query. Cohorts exclude observed multi-parcel deeds across the countywide recent snapshot, unsupported building types, multiple units/buildings, inconsistent living area, nominal prices and unclear deed dates. An arm's-length flag and renovated-condition history are not supplied, so these records remain unreviewed transfer benchmarks. Related-party and other nonmarket transfers can remain. The latest actual transfer date is displayed separately from retrieval time.
+
+Similar-property cohorts exclude the subject itself, match living area within 70–130%, bedrooms within one when known, and year built within 25 years when known. They use at least 3 same-street records, else 5 county-neighborhood records, else 10 within the ZIP, capped at 20 nearest available points. The subject's area is multiplied by the 25th/50th/75th percentile cohort price per square foot. These are historical cohort scenarios, not prediction intervals or after-repair appraisals. Missing building identity, living area or a usable cohort leaves that portion unpriced.
+
+The scheduled publish refreshes the transfer snapshot and generated estimates at 9 AM and 4 PM Eastern. Failed queries retain the previous snapshot and expose the error. This feature is not added to the Excel workbook.
+
 ## Open an individual property
 
 Select a property address or **Open property** in the records table. Each shareable property page groups the available records for that exact county-qualified parcel ID. Code cases from other counties remain separate. The page links to the official county property record when its Guilford parcel identity is established. General publisher pages and raw case data are labeled separately.
@@ -46,6 +58,8 @@ Requires Node 24 or later; there are no package dependencies.
 ```sh
 node --test tests/*.test.mjs
 node scripts/collect.mjs
+node scripts/enrich-properties.mjs
+node scripts/renovation-data.mjs
 python3 -m http.server 4175 --directory docs
 ```
 

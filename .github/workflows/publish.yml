@@ -37,17 +37,20 @@ jobs:
         run: node scripts/collect.mjs
       - name: Collect county property characteristics
         run: node scripts/enrich-properties.mjs
+      - name: Refresh recorded-transfer renovation benchmarks
+        run: node scripts/renovation-data.mjs
       - name: Keep the latest snapshots for the next run
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/data/records.json docs/data/workspace.json docs/data/property-details.json
+          git add docs/data/records.json docs/data/workspace.json docs/data/property-details.json docs/data/transfer-benchmarks.json docs/data/renovation-estimates.json
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh public-record snapshots'
           fi
           git pull --rebase origin main
           node scripts/collect.mjs --workspace-only
-          git add docs/data/workspace.json
+          node scripts/renovation-data.mjs --cached-only
+          git add docs/data/workspace.json docs/data/renovation-estimates.json
           if ! git diff --cached --quiet; then
             git commit -m 'Publish latest shared scenario edits'
           fi
@@ -76,7 +79,8 @@ jobs:
           import { readFileSync } from 'node:fs';
           const data = JSON.parse(readFileSync('docs/data/records.json', 'utf8'));
           const details = JSON.parse(readFileSync('docs/data/property-details.json', 'utf8'));
-          if (data.last_run?.status !== 'succeeded' || details.last_error) {
+          const estimates = JSON.parse(readFileSync('docs/data/renovation-estimates.json', 'utf8'));
+          if (data.last_run?.status !== 'succeeded' || details.last_error || estimates.last_error) {
             console.error('At least one source failed. Last good records and visible source warnings were published.');
             process.exitCode = 1;
           }

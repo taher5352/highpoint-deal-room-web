@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "as_of": "2026-10-17",
+  "tiers": [
+    {"key":"light","label":"Light / cosmetic","rateLow":15,"rateHigh":30,"scope":"Paint, flooring, fixtures and minor cosmetic repairs. Assumes the structure and major systems work."},
+    {"key":"moderate","label":"Moderate renovation","rateLow":30,"rateHigh":60,"scope":"Broader finishes, kitchen and bath updates, and selective system repairs. Scope is assumed, not observed."},
+    {"key":"heavy","label":"Heavy / gut renovation","rateLow":60,"rateHigh":150,"scope":"Extensive demolition, systems and finishes. Does not price demolition and rebuilding a new house."}
+  ],
+  "otherCosts": 0,
+  "futurePriceChangePct": 0,
+  "benchmark": {"months":18,"sizeRatioLow":0.7,"sizeRatioHigh":1.3,"streetMinimum":3,"neighborhoodMinimum":5,"zipMinimum":10,"maximumComparables":20,"lowerPercentile":0.25,"upperPercentile":0.75},
+  "cost_source": {"name":"HomeGuide national whole-house remodeling guide","url":"https://homeguide.com/costs/house-remodeling-cost","date":"2025-12-11","note":"Published national bounds: whole-house remodeling $15–$60 per square foot; gut renovation $60–$150. The light/moderate split is our editable planning assumption, not measured High Point flipper cost."},
+  "flipper_context": {"name":"ATTOM / Backflip Q1 2026 loan analysis","url":"https://www.attomdata.com/news/market-trends/flipping/special-analysis-how-pricing-renovation-costs-and-timing-shaped-returns-in-q1-2026/","date":"2026-07-02","charlotte_average_construction_budget":58857,"note":"Charlotte funded-loan projects averaged a $58,857 construction budget in Q1 2026. This is historical flipper-budget context, not final invoices or a High Point average, and is not used as an individual property budget."},
+  "notes": [
+    "Every scope is an assumed alternative. No scope is selected from tax bills, city cases, building age or old photographs.",
+    "Renovation rates use verified residential living area. Missing or ambiguous living area and unsupported building types remain unpriced.",
+    "Recorded county transfers are unreviewed sale-price benchmarks. The county feed does not publish an arm's-length flag or verified renovated condition. These are not appraisals or inspected after-repair values.",
+    "The same resale range is used across all repair scopes. Spending more does not automatically raise the resale estimate.",
+    "No future appreciation is assumed. Transfer-price quartiles describe the selected historical cohort, not a statistical prediction interval.",
+    "Other and financing costs default to an assumed $0 all-cash screening case. Enter actual financing and extraordinary costs before acting. Profit is before income tax.",
+    "Offer ceilings solve for the shared profit and return targets. They are not asking prices, offers accepted by owners, or evidence a property is available.",
+    "A negative offer ceiling means the scenario has no feasible nonnegative purchase price under these assumptions.",
+    "Contingency is applied once to the whole-house repair allowance. Do not add itemized kitchen, roof or systems costs already included in that allowance."
+  ]
+}

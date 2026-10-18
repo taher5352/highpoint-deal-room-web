@@ -27,6 +27,8 @@ $('#rows').addEventListener('click',event=>{const button=event.target.closest('[
 $('#search').addEventListener('input',render);$('#sort').addEventListener('change',render);
 $('#property-form').addEventListener('submit',event=>event.preventDefault());$('#settings').addEventListener('submit',event=>event.preventDefault());
 $('#export').addEventListener('click',()=>{const link=document.createElement('a'),objectUrl=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));link.href=objectUrl;link.download='highpoint-shared-scenarios.json';link.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);$('#message').textContent='Shared scenarios downloaded.';});
+function syncNavigation(){const hash=location.hash||'#overview';document.querySelectorAll('nav a').forEach(link=>link.classList.toggle('active',link.getAttribute('href')===hash));}
 document.querySelectorAll('nav a').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('nav a').forEach(item=>item.classList.remove('active'));link.classList.add('active');}));
+window.addEventListener('hashchange',syncNavigation);syncNavigation();
 fillSettings();render();
 (async()=>{try{const response=await fetch('./data/workspace.json',{cache:'no-store'});if(!response.ok)throw Error('Shared scenarios unavailable');const value=await response.json(),workspace=value.workspace??value;if(!M.validState(workspace))throw Error('Shared scenarios have an invalid format');state=workspace;fillSettings();render();$('#storage-warning').hidden=true;}catch{$('#storage-warning').hidden=false;}})();
