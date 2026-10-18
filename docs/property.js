@@ -18,7 +18,7 @@
   }
   function link(url, label, className = '') {
     const safe = M.safeUrl(url);
-    return safe ? `<a${className ? ` class="${esc(className)}"` : ''} href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>` : '';
+    return safe ? `<a${className ? ` class="${esc(className)}"` : ''} href="${esc(safe)}" rel="noreferrer">${esc(label)} →</a>` : '';
   }
   function field(label, value, full = false) {
     return `<div${full ? ' class="full"' : ''}><dt>${esc(label)}</dt><dd>${esc(text(value))}</dd></div>`;
