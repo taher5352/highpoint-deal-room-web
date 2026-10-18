@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {quantile,miles,chooseCohort,leadIds,buildRenovationData,refreshTransfers} from '../scripts/renovation-data.mjs';
 
 const policy={sizeRatioLow:.7,sizeRatioHigh:1.3,streetMinimum:3,neighborhoodMinimum:5,zipMinimum:10,maximumComparables:20,lowerPercentile:.25,upperPercentile:.75};
@@ -64,6 +65,17 @@ function fixtures(){
     workspace:{settings:{monthlyHolding:1200}},
   };
 }
+
+test('published investment settings override legacy scenarios without changing resale evidence or the Excel configuration',async()=>{
+  const f=fixtures(),config=JSON.parse(await readFile(new URL('../config/renovation.json',import.meta.url),'utf8'));
+  const before=JSON.stringify(f.workspace);
+  const data=buildRenovationData(f.dataset,f.details,f.transfers,{...f.config,assumptions:config.assumptions,assumption_sources:config.assumption_sources},f.workspace);
+  assert.equal(data.settings.monthlyHold,750);assert.equal(data.settings.financingMode,'loan');
+  assert.equal(data.settings.resaleDiscountPct,5);assert.equal(data.settings.contingencyPct,20);assert.equal(data.settings.targetRoi,20);
+  assert.equal(data.records[0].resale_low,175000,'Published historical evidence is never haircut in the generator');
+  assert.equal(data.sources.length,3+config.assumption_sources.length);assert.equal(JSON.stringify(f.workspace),before);
+  assert.throws(()=>buildRenovationData(f.dataset,f.details,f.transfers,{...f.config,assumptions:{...config.assumptions,annualInterestPct:-1}},f.workspace),/Invalid renovation investment assumptions/);
+});
 
 test('build scales cohort quartiles by supported living area; zero area and other property types never gain values',()=>{
   const f=fixtures();assert.deepEqual(leadIds(f.dataset),['1','2','3']);

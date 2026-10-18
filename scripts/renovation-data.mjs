@@ -3,7 +3,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {collectClosedSales,SALES_LAYER} from '../collectors/sales-source.mjs';
-const require=createRequire(import.meta.url),P=require('../docs/property-model.js');
+const require=createRequire(import.meta.url),P=require('../docs/property-model.js'),M=require('../docs/estimate-model.js');
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const SITE='https://taher5352.github.io/highpoint-deal-room-web/';
 const num=n=>typeof n==='number'&&Number.isFinite(n);
@@ -46,6 +46,8 @@ export function chooseCohort(subject,records,policy){
   return {basis,records:withDistance.slice(0,policy.maximumComparables),eligible_pool_count:selected.length};
 }
 export function buildRenovationData(dataset,details,transfers,config,workspace){
+  const settings=M.normalizeSettings({...workspace.settings,otherCosts:config.otherCosts??0,...config.assumptions});
+  if(!M.validSettings(settings))throw Error('Invalid renovation investment assumptions; refusing to publish estimates');
   const ids=new Set(leadIds(dataset));
   const byDetails=new Map((details.records||[]).map(r=>[P.parcelId(r.parcel_id),r]));
   const contexts=new Map((transfers.subjects||[]).map(r=>[r.parcel_id,r]));
@@ -96,8 +98,8 @@ export function buildRenovationData(dataset,details,transfers,config,workspace){
   return {schema_version:1,generated_at:new Date().toISOString(),as_of_date:new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),source_status:transfers.last_error?'last_good_retained':'collected',last_error:transfers.last_error||null,
     source_checked_at:transfers.generated_at||null,last_attempt_at:transfers.last_attempt_at||transfers.generated_at||null,
     source_updated_at:null,latest_transfer_date:summary.latest_transfer_date,transfer_window:{start:transfers.start_date,end:transfers.end_date},
-    settings:{...workspace.settings,otherCosts:config.otherCosts},tiers:config.tiers,summary,records,
-    sources:[{name:'Guilford County recorded transfer and building facts',url:SALES_LAYER,checked_at:transfers.generated_at,notes:transfers.metadata?.data_freshness},config.cost_source,config.flipper_context],
+    settings,tiers:config.tiers,summary,records,
+    sources:[{name:'Guilford County recorded transfer and building facts',url:SALES_LAYER,checked_at:transfers.generated_at,notes:transfers.metadata?.data_freshness},config.cost_source,config.flipper_context,...(config.assumption_sources||[])],
     notes:[...config.notes,'Similarity policy: living area within 70–130%, bedrooms within one when both are known, construction year within 25 years when both are known. Use at least 3 same-street, else 5 county-neighborhood, else 10 ZIP records. Select at most 20 nearest available points. Exclude the subject itself.',
       'The county source labels its fields heated area. Two official property-card checks independently label the matching values Living Area (SQFT). Building-area conflicts are left unpriced.',
       'Historical prices are not time-adjusted. Current building attributes can differ from those present when the transfer occurred. Marketable or renovated condition has not been verified.'],

@@ -123,3 +123,39 @@ test('the saved real estimate snapshot can be ranked without changing its eviden
   }
   assert.deepEqual(snapshot,before);
 });
+
+test('resale safety haircut recomputes priorities using adjusted resale without mutating the underlying valuation evidence',()=>{
+  const small=property('small',{building_sqft:1000,resale_low:250000,resale_high:250000});
+  const large=property('large',{building_sqft:2000,resale_low:450000,resale_high:450000});
+  const properties=[small,large],before=structuredClone(properties);
+  const raw=M.rankProperties(properties,M.defaults,'light',M.defaultTiers,AS_OF);
+  const adjusted=M.rankProperties(properties,{...M.defaults,resaleDiscountPct:20},'light',M.defaultTiers,AS_OF);
+  assert.deepEqual(keys(raw),['guilford:small','guilford:large']);
+  assert.deepEqual(keys(adjusted),['guilford:large','guilford:small']);
+  const byId=new Map(adjusted.map(row=>[row.property.parcel_id,row]));
+  assert.equal(byId.get('small').result.rawResaleLow,250000);
+  assert.equal(byId.get('small').result.resaleLow,200000);
+  assert.equal(byId.get('large').result.resaleLow,360000);
+  for(const row of adjusted){
+    assert.equal(row.priorityRatio,row.result.offerLow/row.result.resaleLow);
+    assert.ok(row.result.offerLow<raw.find(item=>item.property.parcel_id===row.property.parcel_id).result.offerLow);
+    assert.equal(row.result.profitLow,null);
+  }
+  assert.deepEqual(properties,before);
+});
+
+test('financing changes ranking calculations while an unknown purchase leaves finance costs and profits unknown',()=>{
+  const properties=[property('one'),property('two',{building_sqft:1500,resale_low:350000,resale_high:380000})];
+  const cash=M.rankProperties(properties,M.defaults,'moderate',M.defaultTiers,AS_OF);
+  const settings={...M.defaults,financingMode:'loan',loanPct:80,annualInterestPct:12,loanPointsPct:2};
+  const financed=M.rankProperties(properties,settings,'moderate',M.defaultTiers,AS_OF);
+  assert.equal(financed.length,2);
+  for(const row of financed){
+    const prior=cash.find(item=>item.property.parcel_id===row.property.parcel_id);
+    assert.ok(row.result.offerLow<prior.result.offerLow);
+    assert.equal(row.priorityRatio,row.result.offerLow/row.result.resaleLow);
+    assert.equal(row.result.offerLow,M.analyze(row.property,settings,'moderate',null,M.defaultTiers).offerLow);
+    for(const field of ['loanPrincipal','financingInterest','financingPoints','financingCost','profitLow','roiLow'])assert.equal(row.result[field],null,field);
+  }
+  assert.deepEqual(M.rankProperties(properties,{...settings,monthlyTax:200},'moderate',M.defaultTiers,AS_OF),[]);
+});

@@ -1,6 +1,8 @@
 (function (root) {
   'use strict';
-  const defaults = {buyPct:3,sellPct:8,contingencyPct:15,monthlyHold:1200,months:6,targetProfit:30000,targetRoi:15,otherCosts:0};
+  // Library defaults retain the historical cash scenario. Published defaults live in config/renovation.json.
+  const defaults = {buyPct:3,sellPct:8,contingencyPct:15,monthlyHold:1200,months:6,targetProfit:30000,targetRoi:15,otherCosts:0,
+    financingMode:'cash',loanPct:80,annualInterestPct:12,loanPointsPct:2,resaleDiscountPct:0};
   const defaultTiers = [
     {key:'light',label:'Light / cosmetic',rateLow:15,rateHigh:30},
     {key:'moderate',label:'Moderate renovation',rateLow:30,rateHigh:60},
@@ -9,26 +11,53 @@
   const finite = value => typeof value === 'number' && Number.isFinite(value);
   const positive = value => finite(value) && value > 0;
   const floorCents = value => Math.floor((value + 1e-9) * 100) / 100;
+  const carryKeys=['monthlyTax','monthlyInsurance','monthlyUtilities','monthlyMaintenance'];
+  const financeDefaults={financingMode:'cash',loanPct:80,annualInterestPct:12,loanPointsPct:2,resaleDiscountPct:0};
+  function normalizeSettings(s=defaults) {
+    const settings={...defaults,...s};
+    if(carryKeys.every(key=>Object.hasOwn(settings,key)))settings.monthlyHold=carryKeys.every(key=>finite(settings[key]))?carryKeys.reduce((total,key)=>total+settings[key],0):NaN;
+    return settings;
+  }
   function validSettings(s) {
-    return s && ['buyPct','sellPct'].every(key=>finite(s[key])&&s[key]>=0&&s[key]<100)
+    if(!s||typeof s!=='object')return false;
+    const monthlyParts=carryKeys.filter(key=>Object.hasOwn(s,key));
+    if(monthlyParts.length&&monthlyParts.length!==carryKeys.length)return false;
+    if(!monthlyParts.every(key=>finite(s[key])&&s[key]>=0))return false;
+    const f={...financeDefaults,...s};
+    return ['buyPct','sellPct'].every(key=>finite(s[key])&&s[key]>=0&&s[key]<100)
       && finite(s.contingencyPct)&&s.contingencyPct>=0&&s.contingencyPct<=300
       && finite(s.monthlyHold)&&s.monthlyHold>=0&&finite(s.months)&&s.months>=0&&s.months<=120
       && positive(s.targetProfit)&&positive(s.targetRoi)&&s.targetRoi<=1000
-      && finite(s.otherCosts)&&s.otherCosts>=0;
+      && finite(s.otherCosts)&&s.otherCosts>=0
+      && ['cash','loan'].includes(f.financingMode)
+      && finite(f.loanPct)&&f.loanPct>=0&&f.loanPct<=100
+      && finite(f.annualInterestPct)&&f.annualInterestPct>=0&&f.annualInterestPct<=100
+      && finite(f.loanPointsPct)&&f.loanPointsPct>=0&&f.loanPointsPct<=20
+      && finite(f.resaleDiscountPct)&&f.resaleDiscountPct>=0&&f.resaleDiscountPct<100;
   }
-  function ceiling(resale, repair, settings) {
-    if(!positive(resale)||!finite(repair)||repair<0||!validSettings(settings))return null;
+  function financingFactor(settings) {
+    return settings.financingMode==='loan'?settings.loanPct/100*(settings.annualInterestPct/100*settings.months/12+settings.loanPointsPct/100):0;
+  }
+  function ceiling(rawResale, repair, suppliedSettings) {
+    if(!validSettings(suppliedSettings))return null;
+    const settings=normalizeSettings(suppliedSettings);
+    if(!positive(rawResale)||!finite(repair)||repair<0||!validSettings(settings))return null;
+    const resale=rawResale*(1-settings.resaleDiscountPct/100);
     const buy=settings.buyPct/100,sell=settings.sellPct/100,cont=settings.contingencyPct/100;
     const fixed=repair*(1+cont)+settings.monthlyHold*settings.months+settings.otherCosts;
-    return floorCents(Math.min((resale*(1-sell)-fixed-settings.targetProfit)/(1+buy),
-      (resale/(1+settings.targetRoi/100)-resale*sell-fixed)/(1+buy)));
+    const purchaseFactor=1+buy+financingFactor(settings);
+    return floorCents(Math.min((resale*(1-sell)-fixed-settings.targetProfit)/purchaseFactor,
+      (resale/(1+settings.targetRoi/100)-resale*sell-fixed)/purchaseFactor));
   }
   function analyze(property, suppliedSettings=defaults, scope='moderate', purchase=null, tiers=defaultTiers) {
-    const settings={...defaults,...suppliedSettings},tier=tiers.find(item=>item.key===scope);
+    const settings=normalizeSettings(suppliedSettings),tier=tiers.find(item=>item.key===scope);
     const areaAvailable=property?.area_eligible===true&&positive(property.building_sqft);
     const resaleAvailable=property?.resale_eligible===true&&positive(property.resale_low)&&positive(property.resale_high)&&property.resale_high>=property.resale_low;
     const ratesValid=tier&&finite(tier.rateLow)&&tier.rateLow>=0&&finite(tier.rateHigh)&&tier.rateHigh>=tier.rateLow;
     const settingsValid=validSettings(settings);
+    const discount=settingsValid?1-settings.resaleDiscountPct/100:null;
+    const rawResaleLow=resaleAvailable?property.resale_low:null,rawResaleBase=resaleAvailable&&positive(property.resale_base)?property.resale_base:null,rawResaleHigh=resaleAvailable?property.resale_high:null;
+    const resaleLow=resaleAvailable&&settingsValid?rawResaleLow*discount:null,resaleBase=rawResaleBase!==null&&settingsValid?rawResaleBase*discount:null,resaleHigh=resaleAvailable&&settingsValid?rawResaleHigh*discount:null;
     const available=areaAvailable&&resaleAvailable&&!!ratesValid&&settingsValid;
     const repairLow=areaAvailable&&ratesValid?property.building_sqft*tier.rateLow:null;
     const repairHigh=areaAvailable&&ratesValid?property.building_sqft*tier.rateHigh:null;
@@ -37,22 +66,27 @@
     const offerLow=available?ceiling(property.resale_low,repairHigh,settings):null;
     const offerHigh=available?ceiling(property.resale_high,repairLow,settings):null;
     const purchaseValid=positive(purchase);
-    let totalCostLow=null,totalCostHigh=null,costDownside=null,costUpside=null,profitLow=null,profitHigh=null,roiLow=null,roiHigh=null;
+    let totalCostLow=null,totalCostHigh=null,costDownside=null,costUpside=null,profitLow=null,profitHigh=null,roiLow=null,roiHigh=null,
+      loanPrincipal=null,financingInterest=null,financingPoints=null,financingCost=null;
     const holding=settingsValid?settings.monthlyHold*settings.months:null;
     if(available&&purchaseValid){
-      const acquisition=purchase*(1+settings.buyPct/100);
-      const downside=acquisition+repairWithContingencyHigh+holding+settings.otherCosts+property.resale_low*settings.sellPct/100;
-      const upside=acquisition+repairWithContingencyLow+holding+settings.otherCosts+property.resale_high*settings.sellPct/100;
+      loanPrincipal=settings.financingMode==='loan'?purchase*settings.loanPct/100:0;
+      financingInterest=loanPrincipal*settings.annualInterestPct/100*settings.months/12;
+      financingPoints=loanPrincipal*settings.loanPointsPct/100;
+      financingCost=financingInterest+financingPoints;
+      const acquisition=purchase*(1+settings.buyPct/100)+financingCost;
+      const downside=acquisition+repairWithContingencyHigh+holding+settings.otherCosts+resaleLow*settings.sellPct/100;
+      const upside=acquisition+repairWithContingencyLow+holding+settings.otherCosts+resaleHigh*settings.sellPct/100;
       costDownside=downside;costUpside=upside;
-      totalCostLow=acquisition+repairWithContingencyLow+holding+settings.otherCosts+property.resale_low*settings.sellPct/100;
-      totalCostHigh=acquisition+repairWithContingencyHigh+holding+settings.otherCosts+property.resale_high*settings.sellPct/100;
-      profitLow=property.resale_low-downside;profitHigh=property.resale_high-upside;
+      totalCostLow=acquisition+repairWithContingencyLow+holding+settings.otherCosts+resaleLow*settings.sellPct/100;
+      totalCostHigh=acquisition+repairWithContingencyHigh+holding+settings.otherCosts+resaleHigh*settings.sellPct/100;
+      profitLow=resaleLow-downside;profitHigh=resaleHigh-upside;
       roiLow=profitLow/downside*100;roiHigh=profitHigh/upside*100;
     }
     return {available,areaAvailable,resaleAvailable,settingsValid,scope,tier,
       buildingSqft:areaAvailable?property.building_sqft:null,repairLow,repairHigh,repairWithContingencyLow,repairWithContingencyHigh,
-      resaleLow:resaleAvailable?property.resale_low:null,resaleBase:resaleAvailable?property.resale_base:null,resaleHigh:resaleAvailable?property.resale_high:null,
-      holding,otherCosts:settings.otherCosts,offerLow,offerHigh,
+      rawResaleLow,rawResaleBase,rawResaleHigh,resaleLow,resaleBase,resaleHigh,
+      monthlyCarry:settingsValid?settings.monthlyHold:null,holding,otherCosts:settings.otherCosts,loanPrincipal,financingInterest,financingPoints,financingCost,offerLow,offerHigh,
       offerStatus:!settingsValid?'Invalid screening assumptions':!available?'Missing area or usable transfer benchmark':offerHigh<0?'No feasible purchase in either modeled case':offerLow<0?'Only the optimistic case supports a nonnegative offer':'Conditional offer ceilings',
       purchase:purchaseValid?purchase:null,totalCostLow,totalCostHigh,costDownside,costUpside,profitLow,profitHigh,roiLow,roiHigh,
       meetsTargets:profitLow!==null&&profitLow>=settings.targetProfit&&roiLow>=settings.targetRoi};
@@ -92,6 +126,6 @@
       ||String(a.property.property_key||a.property.parcel_id).localeCompare(String(b.property.property_key||b.property.parcel_id)));
     return candidates.slice(0,10).map((item,index)=>({...item,rank:index+1}));
   }
-  const api={defaults,defaultTiers,validSettings,ceiling,analyze,rankProperties};
+  const api={defaults,defaultTiers,normalizeSettings,validSettings,ceiling,analyze,rankProperties};
   if(typeof module!=='undefined')module.exports=api;else root.RenovationModel=api;
 })(typeof window!=='undefined'?window:globalThis);

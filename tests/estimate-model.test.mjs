@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { analyze, ceiling, defaults, defaultTiers, validSettings } = require('../docs/estimate-model.js');
+const { analyze, ceiling, defaults, defaultTiers, validSettings, normalizeSettings } = require('../docs/estimate-model.js');
 
 let checks = 0;
 function test(name, run) {
@@ -167,6 +167,127 @@ test('scenario low/high bounds use living SF without changing the default rate b
   for (let i = 0; i < defaultTiers.length; i++) {
     const r = analyze(property({building_sqft:1500}), defaults, defaultTiers[i].key);
     assert.deepEqual([r.repairLow,r.repairHigh], expected[i]);
+  }
+});
+
+test('normalization preserves legacy cash defaults and derives complete monthly carrying costs without mutation', () => {
+  assert.equal(defaults.financingMode, 'cash');
+  assert.equal(defaults.monthlyHold, 1200);
+  assert.equal(Object.hasOwn(defaults, 'monthlyTax'), false);
+  assert.equal(validSettings({}), false);
+  const settings = { ...defaults, monthlyHold: 9999, monthlyTax: 200, monthlyInsurance: 200, monthlyUtilities: 250, monthlyMaintenance: 100 };
+  const before = structuredClone(settings),normalized = normalizeSettings(settings);
+  assert.equal(normalized.monthlyHold, 750);
+  assert.equal(validSettings(settings), true);
+  const result = analyze(property(), settings, 'custom', 115000, flat28);
+  assert.equal(result.monthlyCarry, 750);
+  assert.equal(result.holding, 4500);
+  assert.deepEqual(settings, before);
+  const zeros = { ...settings, monthlyTax: 0, monthlyInsurance: 0, monthlyUtilities: 0, monthlyMaintenance: 0 };
+  assert.equal(validSettings(zeros), true);
+  assert.equal(analyze(property(), zeros, 'custom', 115000, flat28).holding, 0);
+});
+
+test('financed purchase ledger charges interest and points, while principal remains financing rather than an extra expense', () => {
+  const financed = { ...defaults, financingMode: 'loan', loanPct: 80, annualInterestPct: 12, loanPointsPct: 2 };
+  const cash = analyze(property(), { ...financed, financingMode: 'cash' }, 'custom', 115000, flat28);
+  const result = analyze(property(), financed, 'custom', 115000, flat28);
+  assert.equal(result.loanPrincipal, 92000);
+  assert.equal(result.financingInterest, 5520); // 92000 × 12% × 6/12.
+  assert.equal(result.financingPoints, 1840); // 92000 × 2%, charged once.
+  assert.equal(result.financingCost, 7360);
+  close(result.totalCostLow, 181610);
+  close(result.totalCostHigh, 181610);
+  close(result.profitLow, 23390);
+  close(result.roiLow, 23390 / 181610 * 100); // Return on project cost, not cash-on-cash.
+  assert.equal(result.totalCostHigh - cash.totalCostHigh, 7360);
+  assert.equal(cash.profitLow - result.profitLow, 7360);
+  assert.equal(result.offerLow, 108957.95);
+  const atCeiling = analyze(property(), financed, 'custom', 108957.95, flat28);
+  const aboveCeiling = analyze(property(), financed, 'custom', 108957.96, flat28);
+  assert.ok(atCeiling.profitLow >= defaults.targetProfit && atCeiling.roiLow >= defaults.targetRoi);
+  assert.ok(aboveCeiling.profitLow < defaults.targetProfit);
+  const extraContingency = analyze(property(), { ...financed, contingencyPct: 30 }, 'custom', 115000, flat28);
+  assert.equal(extraContingency.totalCostHigh - result.totalCostHigh, 4200);
+  assert.equal(extraContingency.financingCost, result.financingCost);
+  for (const key of ['loanPrincipal','financingInterest','financingPoints','financingCost']) assert.equal(cash[key], 0, key);
+});
+
+test('loan points are upfront once, interest varies with the hold, and missing purchase never becomes a zero-dollar loan', () => {
+  const settings = { ...defaults, financingMode: 'loan', loanPct: 80, annualInterestPct: 12, loanPointsPct: 2, monthlyHold: 0 };
+  const at = months => analyze(property(), { ...settings, months }, 'custom', 115000, flat28);
+  const zero = at(0), six = at(6), twelve = at(12);
+  assert.equal(zero.financingInterest, 0);
+  assert.equal(six.financingInterest, 5520);
+  assert.equal(twelve.financingInterest, 11040);
+  for (const result of [zero, six, twelve]) assert.equal(result.financingPoints, 1840);
+  assert.equal(six.totalCostHigh - zero.totalCostHigh, 5520);
+  assert.equal(twelve.totalCostHigh - six.totalCostHigh, 5520);
+  for (const price of [null, undefined, 0, -1, NaN, '115000']) {
+    const result = analyze(property(), settings, 'custom', price, flat28);
+    for (const key of ['loanPrincipal','financingInterest','financingPoints','financingCost']) assert.equal(result[key], null, key);
+    noTransaction(result);
+  }
+});
+
+test('the financed shared planning assumptions have an independent ledger and bind the return target', () => {
+  const settings = { ...defaults, financingMode: 'loan', loanPct: 80, annualInterestPct: 12, loanPointsPct: 2,
+    contingencyPct: 20, monthlyTax: 200, monthlyInsurance: 200, monthlyUtilities: 250, monthlyMaintenance: 100,
+    months: 6, targetProfit: 30000, targetRoi: 20, resaleDiscountPct: 5 };
+  const result = analyze(property(), settings, 'custom', 115000, flat28);
+  assert.equal(result.rawResaleLow, 205000);
+  assert.equal(result.resaleLow, 194750);
+  assert.equal(result.repairLow, 28000);
+  close(result.repairWithContingencyHigh, 33600);
+  assert.equal(result.monthlyCarry, 750);
+  assert.equal(result.holding, 4500);
+  assert.equal(result.financingCost, 7360);
+  // Purchase115000 + buying3450 + repair33600 + carrying4500 + selling15580 + finance7360.
+  close(result.totalCostLow, 179490);
+  close(result.profitLow, 15260);
+  close(result.roiLow, 15260 / 179490 * 100);
+  assert.equal(result.meetsTargets, false);
+  assert.equal(result.offerLow, 99279.40);
+  assert.equal(ceiling(205000, 28000, settings), 99279.40);
+  const atCeiling = analyze(property(), settings, 'custom', 99279.40, flat28);
+  assert.ok(atCeiling.profitLow >= 30000);
+  assert.ok(atCeiling.roiLow >= 20);
+  const above = analyze(property(), settings, 'custom', 99279.41, flat28);
+  assert.ok(above.profitLow < 30000 || above.roiLow < 20);
+});
+
+test('valuation haircut applies once to resale, selling costs and offer ceilings while preserving raw evidence', () => {
+  const p = property({ resale_low: 190000, resale_base: 205000, resale_high: 220000 }),before = structuredClone(p);
+  const settings = { ...defaults, resaleDiscountPct: 10 };
+  const range = analyze(p, settings, 'custom', 115000, flat28);
+  assert.deepEqual([range.rawResaleLow,range.rawResaleBase,range.rawResaleHigh], [190000,205000,220000]);
+  assert.deepEqual([range.resaleLow,range.resaleBase,range.resaleHigh], [171000,184500,198000]);
+  const result = analyze(property(), settings, 'custom', 115000, flat28);
+  assert.equal(result.resaleLow, 184500);
+  close(result.costDownside, 172610);
+  close(result.profitLow, 11890);
+  assert.equal(result.offerLow, 97417.47);
+  assert.equal(ceiling(205000, 28000, settings), result.offerLow);
+  assert.deepEqual(p, before);
+});
+
+test('invalid finance or partial carrying assumptions suppress offer calculations instead of silently substituting zeros', () => {
+  const invalid = [
+    {financingMode:'unknown'}, {loanPct:-1}, {loanPct:101}, {loanPct:'80'},
+    {annualInterestPct:-1}, {annualInterestPct:'12'}, {loanPointsPct:-1}, {loanPointsPct:NaN},
+    {resaleDiscountPct:-1}, {resaleDiscountPct:100}, {resaleDiscountPct:'5'},
+    {monthlyTax:200}, {monthlyTax:200,monthlyInsurance:200,monthlyUtilities:250},
+    {monthlyTax:200,monthlyInsurance:200,monthlyUtilities:250,monthlyMaintenance:null},
+    {monthlyTax:200,monthlyInsurance:200,monthlyUtilities:250,monthlyMaintenance:-1},
+  ];
+  for (const changed of invalid) {
+    const settings = { ...defaults, ...changed };
+    assert.equal(validSettings(settings), false, JSON.stringify(changed));
+    const result = analyze(property(), settings, 'custom', 115000, flat28);
+    assert.equal(result.available, false, JSON.stringify(changed));
+    assert.equal(result.offerLow, null);
+    assert.equal(result.profitLow, null);
+    assert.equal(ceiling(205000, 28000, settings), null);
   }
 });
 

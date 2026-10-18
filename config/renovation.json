@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "as_of": "2026-10-17",
   "tiers": [
     {"key":"light","label":"Light / cosmetic","rateLow":15,"rateHigh":30,"scope":"Paint, flooring, fixtures and minor cosmetic repairs. Assumes the structure and major systems work."},
@@ -7,17 +7,48 @@
     {"key":"heavy","label":"Heavy / gut renovation","rateLow":60,"rateHigh":150,"scope":"Extensive demolition, systems and finishes. Does not price demolition and rebuilding a new house."}
   ],
   "otherCosts": 0,
+  "assumptions": {
+    "buyPct": 3,
+    "sellPct": 8,
+    "contingencyPct": 20,
+    "months": 6,
+    "monthlyTax": 200,
+    "monthlyInsurance": 200,
+    "monthlyUtilities": 250,
+    "monthlyMaintenance": 100,
+    "monthlyHold": 750,
+    "financingMode": "loan",
+    "loanPct": 80,
+    "annualInterestPct": 12,
+    "loanPointsPct": 2,
+    "resaleDiscountPct": 5,
+    "targetProfit": 30000,
+    "targetRoi": 20,
+    "otherCosts": 0
+  },
   "futurePriceChangePct": 0,
   "benchmark": {"months":18,"sizeRatioLow":0.7,"sizeRatioHigh":1.3,"streetMinimum":3,"neighborhoodMinimum":5,"zipMinimum":10,"maximumComparables":20,"lowerPercentile":0.25,"upperPercentile":0.75},
   "cost_source": {"name":"HomeGuide national whole-house remodeling guide","url":"https://homeguide.com/costs/house-remodeling-cost","date":"2025-12-11","note":"Published national bounds: whole-house remodeling $15–$60 per square foot; gut renovation $60–$150. The light/moderate split is our editable planning assumption, not measured High Point flipper cost."},
   "flipper_context": {"name":"ATTOM / Backflip Q1 2026 loan analysis","url":"https://www.attomdata.com/news/market-trends/flipping/special-analysis-how-pricing-renovation-costs-and-timing-shaped-returns-in-q1-2026/","date":"2026-07-02","charlotte_average_construction_budget":58857,"note":"Charlotte funded-loan projects averaged a $58,857 construction budget in Q1 2026. This is historical flipper-budget context, not final invoices or a High Point average, and is not used as an individual property budget."},
+  "assumption_sources": [
+    {"name":"ATTOM Q2 2026 flip timing","url":"https://www.attomdata.com/news/market-trends/flipping/home-flipping-profits-continue-gradual-two-year-decline/","date":"2026-10-01","note":"National typical purchase-to-resale duration was 161 days. Six months is our planning baseline; nine months is a delay stress test, not a measured local percentile. ATTOM gross returns exclude renovation and other expenses and are not our net project ROI."},
+    {"name":"LendingOne financing cost context","url":"https://lendingone.com/insight/fix-and-flip-deal-economics-in-2026-what-the-numbers-actually-look-like/","date":"2026-08-20","note":"August 2026 fix-and-flip discussion describes roughly 9–13% rates and 1–3 origination points. The model's 12% annual interest, two points and 80% purchase financing are editable illustrations, not a lender quote or approval."},
+    {"name":"Guilford County 2026–2027 property tax rates","url":"https://www.guilfordcountync.gov/government/departments-and-agencies/tax-department/2026-2027-tax-property-rates","checked_at":"2026-10-17","note":"Ordinary Guilford/High Point rates total 1.5244% of taxable assessed value annually. The model uses an editable $200 monthly tax allowance because the parcel's applicable tax basis and jurisdiction have not been verified for budgeting. Unpaid research bills are not used as annual holding costs."},
+    {"name":"NC Real Estate Commission: negotiated compensation","url":"https://bulletins.ncrec.gov/buyer-agency-agreements/","checked_at":"2026-10-17","note":"Broker compensation is negotiable. The 8% all-in sale allowance is our planning choice, including brokerage, concessions, closing and transfer expenses; it is not a prescribed commission."},
+    {"name":"North Carolina transfer excise tax","url":"https://www3.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_105/GS_105-228.30.html","checked_at":"2026-10-17","note":"The transferor pays $1 for each $500 or fraction of consideration. This is covered by the all-in selling allowance rather than added a second time."}
+  ],
   "notes": [
     "Every scope is an assumed alternative. No scope is selected from tax bills, city cases, building age or old photographs.",
     "Renovation rates use verified residential living area. Missing or ambiguous living area and unsupported building types remain unpriced.",
     "Recorded county transfers are unreviewed sale-price benchmarks. The county feed does not publish an arm's-length flag or verified renovated condition. These are not appraisals or inspected after-repair values.",
     "The same resale range is used across all repair scopes. Spending more does not automatically raise the resale estimate.",
-    "No future appreciation is assumed. Transfer-price quartiles describe the selected historical cohort, not a statistical prediction interval.",
-    "Other and financing costs default to an assumed $0 all-cash screening case. Enter actual financing and extraordinary costs before acting. Profit is before income tax.",
+    "No future appreciation is assumed. A separate 5% default resale safety cushion reduces the historical scenarios for screening; it is an analyst stress assumption, not a market forecast. Transfer-price quartiles are not a statistical prediction interval.",
+    "The financed baseline borrows 80% of purchase at 12% annual simple interest plus two origination points for six months. Repairs are assumed cash-funded. Rehab draw interest, draw fees, extensions and minimum loan eligibility are not established; add actual extra fees under other costs. Cash mode removes the modeled interest and points.",
+    "Published default monthly holding allowances are $200 tax, $200 insurance, $250 utilities and $100 maintenance/security/HOA: $750 before financing interest. These are provisional planning amounts, not verified tax bills, insurance quotes or HOA dues.",
+    "Published default buying costs are a 3% purchase allowance excluding separately modeled loan interest and points. Selling costs are an 8% all-in resale allowance including negotiated brokerage, concessions, closing costs and NC transfer excise; do not count these twice.",
+    "Published default repair contingency is 20%. Extra project costs default to $0 because title arrears, legal issues, major environmental remediation and unusual repairs have not been priced. Enter them before a purchase decision. Profit is before income tax; ROI uses total project cost, not cash invested.",
+    "The screening targets are $30,000 profit and 20% return on total project cost in the lower resale / higher repair case. These are investment hurdles, not expected returns. A nine-month delay adds holding and loan interest; lender extension fees must be entered separately.",
+    "Investment assumptions can be changed in the dashboard and are saved only in that browser. Reset restores the latest published defaults. Owner changes to the shared defaults are managed in config/renovation.json.",
     "Offer ceilings solve for the shared profit and return targets. They are not asking prices, offers accepted by owners, or evidence a property is available.",
     "A negative offer ceiling means the scenario has no feasible nonnegative purchase price under these assumptions.",
     "Contingency is applied once to the whole-house repair allowance. Do not add itemized kitchen, roof or systems costs already included in that allowance."
