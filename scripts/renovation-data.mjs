@@ -93,7 +93,7 @@ export function buildRenovationData(dataset,details,transfers,config,workspace){
     neighborhood_benchmarks:records.filter(r=>r.resale_basis==='County neighborhood').length,zip_benchmarks:records.filter(r=>r.resale_basis==='Nearby in ZIP 27260').length,
     transfer_records:transfers.records?.length||0,usable_transfers:(transfers.records||[]).filter(r=>r.rough_cohort_eligible).length,
     latest_transfer_date:transfers.metadata?.latest_zip_reported_sale_date||null,other_property_types:ids.size-records.length};
-  return {schema_version:1,generated_at:new Date().toISOString(),source_status:transfers.last_error?'last_good_retained':'collected',last_error:transfers.last_error||null,
+  return {schema_version:1,generated_at:new Date().toISOString(),as_of_date:new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),source_status:transfers.last_error?'last_good_retained':'collected',last_error:transfers.last_error||null,
     source_checked_at:transfers.generated_at||null,last_attempt_at:transfers.last_attempt_at||transfers.generated_at||null,
     source_updated_at:null,latest_transfer_date:summary.latest_transfer_date,transfer_window:{start:transfers.start_date,end:transfers.end_date},
     settings:{...workspace.settings,otherCosts:config.otherCosts},tiers:config.tiers,summary,records,

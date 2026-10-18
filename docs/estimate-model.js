@@ -57,6 +57,41 @@
       purchase:purchaseValid?purchase:null,totalCostLow,totalCostHigh,costDownside,costUpside,profitLow,profitHigh,roiLow,roiHigh,
       meetsTargets:profitLow!==null&&profitLow>=settings.targetProfit&&roiLow>=settings.targetRoi};
   }
-  const api={defaults,defaultTiers,validSettings,ceiling,analyze};
+  function calendarDate(value) {
+    if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return null;
+    const date=new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value?date:null;
+  }
+  const parcelKey = value => value==null?'':String(value).trim().replace(/^0+(?=\d)/,'');
+  function rankProperties(records,suppliedSettings=defaults,scope='moderate',tiers=defaultTiers,asOf=new Date().toISOString().slice(0,10)) {
+    const cutoff=calendarDate(asOf);
+    if(!cutoff||!Array.isArray(records)||!Array.isArray(tiers))return [];
+    const year=cutoff.getUTCFullYear()-1,month=cutoff.getUTCMonth();
+    const recentFrom=new Date(Date.UTC(year,month,Math.min(cutoff.getUTCDate(),new Date(Date.UTC(year,month+1,0)).getUTCDate()))).toISOString().slice(0,10);
+    const candidates=[],seenProperties=new Set();
+    for(const property of records){
+      const key=parcelKey(property?.parcel_id)||property?.property_key;
+      if(!key||seenProperties.has(key))continue;
+      seenProperties.add(key);
+      const result=analyze(property,suppliedSettings,scope,null,tiers);
+      if(!result.available||!positive(result.offerLow))continue;
+      const seenParcels=new Set(),seenDeeds=new Set(),comparisons=[];
+      for(const comp of property.comparables||[]){
+        const parcel=parcelKey(comp.parcel_id),deed=String(comp.deed_reference||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        if(!parcel||parcel===parcelKey(property.parcel_id)||!calendarDate(comp.sale_date)||comp.sale_date>asOf||!positive(comp.price)||!positive(comp.living_sqft))continue;
+        if(seenParcels.has(parcel)||(deed&&seenDeeds.has(deed)))continue;
+        seenParcels.add(parcel);if(deed)seenDeeds.add(deed);comparisons.push(comp);
+      }
+      const comparableCount=comparisons.length,recentCount=comparisons.filter(comp=>comp.sale_date>=recentFrom).length;
+      if(comparableCount<5||recentCount/comparableCount<.5)continue;
+      candidates.push({property,result,priorityRatio:result.offerLow/result.resaleLow,comparableCount,recentCount,
+        recentFraction:recentCount/comparableCount,latestTransfer:comparisons.reduce((latest,comp)=>comp.sale_date>latest?comp.sale_date:latest,'')});
+    }
+    candidates.sort((a,b)=>b.priorityRatio-a.priorityRatio||b.recentFraction-a.recentFraction||b.recentCount-a.recentCount
+      ||b.comparableCount-a.comparableCount||b.latestTransfer.localeCompare(a.latestTransfer)
+      ||String(a.property.property_key||a.property.parcel_id).localeCompare(String(b.property.property_key||b.property.parcel_id)));
+    return candidates.slice(0,10).map((item,index)=>({...item,rank:index+1}));
+  }
+  const api={defaults,defaultTiers,validSettings,ceiling,analyze,rankProperties};
   if(typeof module!=='undefined')module.exports=api;else root.RenovationModel=api;
 })(typeof window!=='undefined'?window:globalThis);
