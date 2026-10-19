@@ -88,9 +88,10 @@
   function health(model) {
     const cards = model.sources.map(source => {
       const metadata = source.metadata || {};
+      const freshness = M.sourceHealth(source);
       const sourceDate = metadata.source_updated_at || null;
       const sourceDateMeaning = metadata.source_date_meaning || metadata.update_date_meaning || (source.id === 'foreclosures' ? 'No per-record update date is supplied by this feed.' : 'Publisher dates do not establish a new investment opportunity.');
-      return `<article class="source-health-card"><h3>${esc(source.name || source.id)} <span class="badge">${esc(source.state || 'Saved source')}</span></h3>${fields([
+      return `<article class="source-health-card"><h3>${esc(source.name || source.id)} <span class="badge">${esc(freshness.label)}</span></h3><p${freshness.state !== 'collected' ? ' class="source-error"' : ''}>${esc(freshness.note)}</p>${fields([
         ['Last successful collection', date(source.last_success_at)], ['Last collection attempt', date(source.last_attempt_at)],
         ['Reported source date', date(sourceDate)], ['Records in entire source', source.record_count]
       ])}${source.last_error ? `<p class="source-error"><strong>Last reported collection error:</strong> ${esc(typeof source.last_error === 'string' ? source.last_error : JSON.stringify(source.last_error))}</p>` : '<p>No collection error is recorded for this source in the saved dataset.</p>'}<p>${esc(sourceDateMeaning)}</p>${source.scope ? `<p><strong>Coverage:</strong> ${esc(source.scope)}</p>` : ''}${link(source.url, 'Source information')}${source.id === 'parcels' ? `<p>County original address update: ${esc(date(metadata.latest_original_address_update))}<br>County layer edit: ${esc(date(metadata.latest_address_layer_edit))}<br>City address edit: ${esc(date(metadata.latest_city_address_edit))}<br>City processing update: ${esc(date(metadata.latest_city_processing_update))}</p>` : ''}</article>`;
@@ -117,6 +118,7 @@
         ${model.groups.other.length ? section('other-records', 'PUBLISHED EVIDENCE', 'Other source records', model.groups.other, rawSelected, '') : ''}
       </div><aside class="property-verification" aria-label="Property identity and verification">${verification(model)}<section class="panel property-section"><div class="section-head"><div><span class="eyebrow">CONTINUE THE RESEARCH</span><h2>What still needs checking</h2></div></div><div class="verification-body"><p>Confirm the property’s current condition, title, occupancy and legal proceedings. Obtain a current tax payoff directly from the county.</p><p>Asking price, repair budget and resale value need separate evidence before underwriting. No investment score or profit estimate is generated from these public-record flags.</p><a href="./index.html#public-records">Return to all property records →</a></div></section></aside></div>
       ${health(model)}`;
+    if (window.RecordViewModel) document.querySelectorAll('a[href="./index.html#public-records"]').forEach(anchor => anchor.href = window.RecordViewModel.backUrl(window.location.search));
     document.getElementById('property-state').hidden = true;
     document.getElementById('property-content').hidden = false;
   }
@@ -137,6 +139,10 @@
     } catch (_) {
       state('The saved records could not be loaded.', 'The dataset may be temporarily unavailable. Reload this page or return to the dashboard. No live listing or property API was queried.', true);
     }
+  }
+  if (window.RecordViewModel) {
+    const back = window.RecordViewModel.backUrl(window.location.search);
+    document.querySelectorAll('a.property-back, nav a[href="./index.html#public-records"]').forEach(anchor => anchor.href = back);
   }
   load();
 })();
