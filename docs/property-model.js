@@ -36,6 +36,20 @@
     return id && countyKey(record) === 'guilford' ? `https://bcpwa.ncptscloud.com/guilford/bill-search?parcelid=${id}` : null;
   }
   const countyMapUrl = () => null;
+  function sourceHealth(source, now = Date.now()) {
+    // A saved collection badge describes publication time, not viewing time.
+    const raw = source?.last_success_at;
+    const timestamp = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/.test(raw);
+    const calendarDate = timestamp ? raw.slice(0, 10) : '';
+    const calendarTime = Date.parse(calendarDate + 'T00:00:00Z');
+    const realDate = Number.isFinite(calendarTime) && new Date(calendarTime).toISOString().slice(0, 10) === calendarDate;
+    const success = realDate ? Date.parse(raw) : NaN;
+    const valid = Number.isFinite(success) && Number.isFinite(now) && success <= now;
+    if (!valid) return { state: 'not_verified', label: 'Freshness unverified', note: 'A valid past collection timestamp is not available. Verify the original source before using these saved records.' };
+    if (source.last_error) return { state: 'last_good_retained', label: 'Last good retained', note: 'The latest collection attempt failed. These records come from the last successful collection.' };
+    if (now - success > 48 * 3600000) return { state: 'stale', label: 'Snapshot over 48 hours old', note: 'This saved source snapshot is over 48 hours old. Check refresh history and the official source for newer evidence.' };
+    return { state: 'collected', label: 'Collected within 48 hours', note: 'Collection succeeded within 48 hours. This does not establish that the underlying property record changed.' };
+  }
   function sourceLinkLabel(record) {
     return ({ code_case: 'City case data (JSON)', tax_bill: 'County tax download / source', foreclosure: 'County foreclosure map (all cases)', parcel: 'County address data service' })[record?.record_type] || 'Published source';
   }
@@ -88,7 +102,7 @@
       groupNote: canGroup ? 'Related records use the same Guilford County parcel identifier across the complete saved dataset. Current dashboard filters do not limit this page.' : 'Showing only the selected source record. Its county or parcel identifier does not support a safe Guilford County join; matching street names are not used.'
     };
   }
-  const api = { normalId, parcelId, countyKey, addressZip, safeUrl, escapeHtml, countyPropertyUrl, countyTaxUrl, countyMapUrl, sourceLinkLabel, selectProperty };
+  const api = { normalId, parcelId, countyKey, addressZip, safeUrl, escapeHtml, countyPropertyUrl, countyTaxUrl, countyMapUrl, sourceHealth, sourceLinkLabel, selectProperty };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PropertyModel = api;
 })(typeof window !== 'undefined' ? window : globalThis);
